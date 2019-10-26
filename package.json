@@ -1,0 +1,28 @@
+{
+  "name": "mongoose-versioning",
+  "version": "0.1.0",
+  "description": "mongoose-versioning automatically adds history support on your mongoose models",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc"
+  },
+  "author": "Pierre Cabriere <hello@pierrecabriere.fr>",
+  "license": "Apache 2.0",
+  "keywords": [
+    "mongoose",
+    "query",
+    "subquery",
+    "ref",
+    "reference",
+    "nested",
+    "field"
+  ],
+  "homepage": "https://github.com/pierrecabriere/mongoose-versioning",
+  "devDependencies": {
+    "@types/mongoose": "^5.5.6",
+    "typescript": "^3.5.2"
+  },
+  "dependencies": {
+    "deep-diff": "^1.0.2"
+  }
+}
