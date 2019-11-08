@@ -60,7 +60,7 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
         return;
       }
 
-      this.diffs = this.diffs.filter(filterFn);
+      this.diffs = this.diffs && this.diffs.filter(filterFn);
     }
   }
 
