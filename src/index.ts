@@ -35,7 +35,7 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
       item.document = (item.__original && item.__original.id) || (item.__updated && item.__updated.id);
       item.date = new Date();
       const diffs = DeepDiff.diff(item.__original && item.__original.toJSON(), item.__updated && item.__updated.toJSON());
-      Object.assign(item, { diffs: [...diffs] });
+      Object.assign(item, { diffs: diffs && [...diffs] });
 
       return item;
     }
