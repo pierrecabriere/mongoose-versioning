@@ -40,17 +40,18 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
       return item;
     }
 
-    assignMetas(metas) {
+    async assignMetas(metas) {
       if (!metas) {
         return;
       }
 
-      Object.keys(metas).forEach(key => {
+      await Promise.all(Object.keys(metas).map(async key => {
         const value = metas[key];
         if (typeof value === "function") {
-          metas[key] = value(this.__original, this.__updated, this.__context);
+          metas[key] = await value(this.__original, this.__updated, this.__context);
         }
-      });
+      }));
+
       this.metas = this.metas || {};
       Object.assign(this.metas, metas);
     }
@@ -87,8 +88,42 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
       diffs: [{
         kind: String,
         path: [String],
-        lhs: mongoose.Schema.Types.Mixed,
-        rhs: mongoose.Schema.Types.Mixed
+        lhs: {
+          type: String,
+          default: null,
+          set: v => {
+            try {
+              return JSON.stringify(v);
+            } catch {
+              return v;
+            }
+          },
+          get: v => {
+            try {
+              return JSON.parse(v);
+            } catch {
+              return v;
+            }
+          },
+        },
+        rhs: {
+          type: String,
+          default: null,
+          set: v => {
+            try {
+              return JSON.stringify(v);
+            } catch {
+              return v;
+            }
+          },
+          get: v => {
+            try {
+              return JSON.parse(v);
+            } catch {
+              return v;
+            }
+          },
+        }
       }]
     }, { versionKey: false });
     HistoryItemSchema.loadClass(HistoryItemClass);
@@ -114,8 +149,8 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
       // @ts-ignore
       const HistoryItem = getHistoryModel(document.constructor.collection.name, document.constructor.modelName);
       const historyItem = HistoryItem.create(undefined, document, document);
-      historyItem.assignMetas(options.metas);
       historyItem.filterDiffs(options.filter);
+      await historyItem.assignMetas(options.metas);
       await historyItem.save();
     }
   };
