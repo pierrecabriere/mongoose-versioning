@@ -92,7 +92,7 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
           type: String,
           default: null,
           set: v => {
-            if (v && typeof v === "object") {
+            if (v && typeof v === "object" && Object.keys(v).length) {
               try {
                 return JSON.stringify(v);
               } catch {
@@ -114,7 +114,7 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
           type: String,
           default: null,
           set: v => {
-            if (v && typeof v === "object") {
+            if (v && typeof v === "object" && Object.keys(v).length) {
               try {
                 return JSON.stringify(v);
               } catch {
@@ -188,6 +188,7 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
       const historyItem = HistoryItem.create(row, updatedRow, query);
       historyItem.assignMetas(options.metas);
       historyItem.filterDiffs(options.filter);
+      console.log(historyItem);
       await historyItem.save();
     }));
   };
