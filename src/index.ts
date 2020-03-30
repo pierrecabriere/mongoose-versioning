@@ -15,8 +15,8 @@ const getDiffPaths = (object, base, path = []) => {
     keys = keys.concat(Object.keys(base).filter(key => !keys.includes(key)));
   } catch (e) {}
   return keys.reduce((result, key) => {
-    const to = object && object[key] && mongoose.Types.ObjectId.isValid(object[key]) ? object[key].toString() : object[key];
-    const from = base && base[key] && mongoose.Types.ObjectId.isValid(base[key]) ? base[key].toString() : base[key];
+    const to = object && object[key] && mongoose.Types.ObjectId.isValid(object[key]) ? object[key].toString() : object && object[key];
+    const from = base && base[key] && mongoose.Types.ObjectId.isValid(base[key]) ? base[key].toString() : base && base[key];
 
     if ((to && typeof to === "object" && Object.keys(to).length) || (from && typeof from === "object" && Object.keys(from).length)) {
       return result.concat(getDiffPaths(to, from, path.concat(key)));
