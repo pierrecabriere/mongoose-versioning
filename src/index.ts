@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import DeepDiff from "deep-diff";
+import _ from "lodash/object";
 
 interface IOptions {
   connection?: mongoose.Connection,
@@ -8,6 +8,31 @@ interface IOptions {
   metas?: any,
   filter?: Function
 }
+
+const getDiffPaths = (object, base, path = []) => {
+  return Object.keys(object).reduce((result, key) => {
+    const to = object && object[key] && mongoose.Types.ObjectId.isValid(object[key]) ? object[key].toString() : object[key];
+    const from = base && base[key] && mongoose.Types.ObjectId.isValid(base[key]) ? base[key].toString() : base[key];
+
+    if ((to && typeof to === "object" && Object.keys(to).length) || (from && typeof from === "object" && Object.keys(from).length)) {
+      return result.concat(getDiffPaths(to, from, path.concat(key)));
+    } else {
+      return (to && to.toString()) == (from && from.toString()) ? result : result.concat([path.concat(key)]);
+    }
+  }, []);
+};
+
+const getDiffs = (object, base) => {
+  const diffPaths = getDiffPaths(object, base);
+  return diffPaths.reduce((diffs, path) => {
+    const key = path.join(".");
+    return diffs.concat({
+      path,
+      from: _.get(base, key),
+      to: _.get(object, key),
+    });
+  }, []);
+};
 
 function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
   class HistoryItemClass {
@@ -34,8 +59,16 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
 
       item.document = (item.__original && item.__original.id) || (item.__updated && item.__updated.id);
       item.date = new Date();
-      const diffs = DeepDiff.diff(item.__original && item.__original.toJSON(), item.__updated && item.__updated.toJSON());
-      Object.assign(item, { diffs: diffs && [...diffs] });
+
+      if (item.__original === undefined) {
+        item.kind = "create";
+      } else if (item.__updated === undefined) {
+        item.kind = "delete";
+      } else {
+        item.kind = "update";
+        const diffs = getDiffs(item.__updated && item.__updated.toJSON(), item.__original && item.__original.toJSON());
+        Object.assign(item, { diffs });
+      }
 
       return item;
     }
@@ -88,49 +121,11 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
       diffs: [{
         kind: String,
         path: [String],
-        lhs: {
-          type: String,
-          default: null,
-          set: v => {
-            if (v && typeof v === "object" && Object.keys(v).length) {
-              try {
-                return JSON.stringify(v);
-              } catch {
-                return v;
-              }
-            }
-
-            return v;
-          },
-          get: v => {
-            try {
-              return JSON.parse(v);
-            } catch {
-              return v;
-            }
-          },
+        from: {
+          type: mongoose.Schema.Types.Mixed,
         },
-        rhs: {
-          type: String,
-          default: null,
-          set: v => {
-            if (v && typeof v === "object" && Object.keys(v).length) {
-              try {
-                return JSON.stringify(v);
-              } catch {
-                return v;
-              }
-            }
-
-            return v;
-          },
-          get: v => {
-            try {
-              return JSON.parse(v);
-            } catch {
-              return v;
-            }
-          },
+        to: {
+          type: mongoose.Schema.Types.Mixed
         }
       }]
     }, { versionKey: false });
@@ -185,6 +180,7 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
       }
 
       const HistoryItem = getHistoryModel(query.model.collection.name, query.model.modelName);
+      HistoryItem.create(row, updatedRow, query);
       const historyItem = HistoryItem.create(row, updatedRow, query);
       historyItem.assignMetas(options.metas);
       historyItem.filterDiffs(options.filter);
