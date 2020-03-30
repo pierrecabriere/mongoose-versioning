@@ -188,7 +188,6 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
       const historyItem = HistoryItem.create(row, updatedRow, query);
       historyItem.assignMetas(options.metas);
       historyItem.filterDiffs(options.filter);
-      console.log(historyItem);
       await historyItem.save();
     }));
   };
