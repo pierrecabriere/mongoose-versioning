@@ -10,8 +10,10 @@ interface IOptions {
 }
 
 const getDiffPaths = (object, base, path = []) => {
-  let keys = Object.keys(object);
-  keys = keys.concat(Object.keys(base).filter(key => !keys.includes(key)));
+  let keys = object ? Object.keys(object) : [];
+  try {
+    keys = keys.concat(Object.keys(base).filter(key => !keys.includes(key)));
+  } catch (e) {}
   return keys.reduce((result, key) => {
     const to = object && object[key] && mongoose.Types.ObjectId.isValid(object[key]) ? object[key].toString() : object[key];
     const from = base && base[key] && mongoose.Types.ObjectId.isValid(base[key]) ? base[key].toString() : base[key];

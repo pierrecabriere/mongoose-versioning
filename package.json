@@ -1,6 +1,6 @@
 {
   "name": "mongoose-versioning",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "mongoose-versioning automatically adds history support on your mongoose models",
   "main": "dist/index.js",
   "scripts": {
@@ -16,6 +16,7 @@
     "ref",
     "reference",
     "nested",
+    "diff",
     "field"
   ],
   "homepage": "https://github.com/pierrecabriere/mongoose-versioning",
