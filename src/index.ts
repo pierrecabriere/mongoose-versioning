@@ -165,60 +165,86 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
   const preUpdate = async function () {
     // @ts-ignore
     const query = this as mongoose.Query;
-    const queryUpdating = new (query.toConstructor())();
-    queryUpdating.setUpdate({});
-    query.__updatingRows = await queryUpdating.find();
+
+    try {
+      const queryUpdating = new (query.toConstructor())();
+      queryUpdating.setUpdate({});
+      query.__updatingRows = await queryUpdating.find();
+    } catch (e) {
+      query.__updatingRows = [];
+    }
   };
 
   const postUpdate = async function () {
     // @ts-ignore
     const query = this as mongoose.Query;
-    const queryUpdated = new (query.toConstructor())();
-    queryUpdated.setUpdate({});
-    query.__updatedRows = await queryUpdated.find();
+    new Promise(async (resolve, reject) => {
+      try {
+        const queryUpdated = new (query.toConstructor())();
+        queryUpdated.setUpdate({});
+        query.__updatedRows = await queryUpdated.find();
 
-    await Promise.all(query.__updatingRows.map(async row => {
-      const updatedRow = query.__updatedRows.find(({ id }) => id === row.id);
-      if (!updatedRow) {
-        return;
+        await Promise.all(query.__updatingRows.map(async row => {
+          const updatedRow = query.__updatedRows.find(({ id }) => id === row.id);
+          if (!updatedRow) {
+            return;
+          }
+
+          const HistoryItem = getHistoryModel(query.model.collection.name, query.model.modelName);
+          HistoryItem.create(row, updatedRow, query);
+          const historyItem = HistoryItem.create(row, updatedRow, query);
+          historyItem.assignMetas(options.metas);
+          historyItem.filterDiffs(options.filter);
+          await historyItem.save();
+        }));
+
+        resolve();
+      } catch (e) {
+        reject(e);
       }
-
-      const HistoryItem = getHistoryModel(query.model.collection.name, query.model.modelName);
-      HistoryItem.create(row, updatedRow, query);
-      const historyItem = HistoryItem.create(row, updatedRow, query);
-      historyItem.assignMetas(options.metas);
-      historyItem.filterDiffs(options.filter);
-      await historyItem.save();
-    }));
+    });
   };
 
   const preDelete = async function () {
     // @ts-ignore
     const query = this as mongoose.Query;
-    const queryDeleting = new (query.toConstructor())();
-    queryDeleting.setUpdate({});
-    query.__deletingRows = await queryDeleting.find();
+
+    try {
+      const queryDeleting = new (query.toConstructor())();
+      queryDeleting.setUpdate({});
+      query.__deletingRows = await queryDeleting.find();
+    } catch (e) {
+      query.__deletingRows = [];
+    }
   };
 
   const postDelete = async function () {
     // @ts-ignore
     const query = this as mongoose.Query;
-    const queryDeleted = new (query.toConstructor())();
-    queryDeleted.setUpdate({});
-    query.__deletedRows = await queryDeleted.find();
+    new Promise(async (resolve, reject) => {
+      try {
+        const queryDeleted = new (query.toConstructor())();
+        queryDeleted.setUpdate({});
+        query.__deletedRows = await queryDeleted.find();
 
-    await Promise.all(query.__deletingRows.map(async row => {
-      const deletedRow = query.__deletedRows.find(({ id }) => id === row.id);
-      if (deletedRow) {
-        return;
+        await Promise.all(query.__deletingRows.map(async row => {
+          const deletedRow = query.__deletedRows.find(({ id }) => id === row.id);
+          if (deletedRow) {
+            return;
+          }
+
+          const HistoryItem = getHistoryModel(query.model.collection.name, query.model.modelName);
+          const historyItem = HistoryItem.create(row, undefined, query);
+          historyItem.assignMetas(options.metas);
+          historyItem.filterDiffs(options.filter);
+          await historyItem.save();
+        }));
+
+        resolve();
+      } catch (e) {
+        reject(e);
       }
-
-      const HistoryItem = getHistoryModel(query.model.collection.name, query.model.modelName);
-      const historyItem = HistoryItem.create(row, undefined, query);
-      historyItem.assignMetas(options.metas);
-      historyItem.filterDiffs(options.filter);
-      await historyItem.save();
-    }));
+    });
   };
 
   schema.statics.getHistoryModel = function () {
