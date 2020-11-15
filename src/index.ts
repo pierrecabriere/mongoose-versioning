@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import _ from "lodash/object";
+import isEqual from "fast-deep-equal";
 
 interface IOptions {
   connection?: mongoose.Connection,
@@ -18,7 +19,7 @@ const getDiffPaths = (object, base, path = []) => {
     const to = object && object[key] && mongoose.Types.ObjectId.isValid(object[key]) ? object[key].toString() : object && object[key];
     const from = base && base[key] && mongoose.Types.ObjectId.isValid(base[key]) ? base[key].toString() : base && base[key];
 
-    if ((to && typeof to === "object" && Object.keys(to).length) || (from && typeof from === "object" && Object.keys(from).length)) {
+    if ((to && typeof to === "object" && Object.keys(to).length && !Array.isArray(to)) || (from && typeof from === "object" && Object.keys(from).length) && !Array.isArray(from)) {
       return result.concat(getDiffPaths(to, from, path.concat(key)));
     } else {
       return (to && to.toString()) == (from && from.toString()) ? result : result.concat([path.concat(key)]);
@@ -26,15 +27,16 @@ const getDiffPaths = (object, base, path = []) => {
   }, []);
 };
 
-const getDiffs = (object, base) => {
-  const diffPaths = getDiffPaths(object, base);
-  return diffPaths.reduce((diffs, path) => {
-    const key = path.join(".");
-    return diffs.concat({
-      path,
-      from: _.get(base, key),
-      to: _.get(object, key),
-    });
+const getDiffs = (object, base = {}) => {
+  const paths = getDiffPaths(object, base);
+  return paths.reduce((diffs, path) => {
+    const from = base && _.get(base, path);
+    const to = object && _.get(object, path);
+    if (!isEqual(from, to)) {
+      return diffs.concat({ path: path.join("."), from, to });
+    }
+
+    return diffs;
   }, []);
 };
 
@@ -66,6 +68,8 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
 
       if (item.__original === undefined) {
         item.kind = "create";
+        const diffs = getDiffs(item.__updated && item.__updated.toJSON());
+        Object.assign(item, { diffs });
       } else if (item.__updated === undefined) {
         item.kind = "delete";
       } else {
@@ -124,7 +128,7 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
       metas: mongoose.Schema.Types.Mixed,
       diffs: [{
         kind: String,
-        path: [String],
+        path: String,
         from: {
           type: mongoose.Schema.Types.Mixed,
         },
