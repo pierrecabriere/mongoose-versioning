@@ -68,6 +68,8 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
         Object.assign(item, { diffs });
       } else if (item.__updated === undefined) {
         item.kind = "delete";
+        const diffs = getDiffs(undefined, item.__original && item.__original.toJSON());
+        Object.assign(item, { diffs });
       } else {
         item.kind = "update";
         const diffs = getDiffs(item.__updated && item.__updated.toJSON(), item.__original && item.__original.toJSON());
