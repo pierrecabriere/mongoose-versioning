@@ -16,13 +16,13 @@ const getDiffPaths = (object, base, path = []) => {
     keys = keys.concat(Object.keys(base).filter(key => !keys.includes(key)));
   } catch (e) {}
   return keys.reduce((result, key) => {
-    const to = object && object[key] && mongoose.Types.ObjectId.isValid(object[key]) ? object[key].toString() : object && object[key];
-    const from = base && base[key] && mongoose.Types.ObjectId.isValid(base[key]) ? base[key].toString() : base && base[key];
+    const to = object && _.get(object, key) && mongoose.Types.ObjectId.isValid(object[key]) ? _.get(object, key).toString() : object && _.get(object, key);
+    const from = base && _.get(base, key) && mongoose.Types.ObjectId.isValid(base[key]) ? _.get(base, key).toString() : base && _.get(base, key);
 
     if ((to && typeof to === "object" && Object.keys(to).length && !Array.isArray(to)) || (from && typeof from === "object" && Object.keys(from).length) && !Array.isArray(from)) {
       return result.concat(getDiffPaths(to, from, path.concat(key)));
     } else {
-      return (to && to.toString()) == (from && from.toString()) ? result : result.concat([path.concat(key)]);
+      return isEqual(from, to) ? result : result.concat([path.concat(key)]);
     }
   }, []);
 };
@@ -32,11 +32,7 @@ const getDiffs = (object, base = {}) => {
   return paths.reduce((diffs, path) => {
     const from = base && _.get(base, path);
     const to = object && _.get(object, path);
-    if (!isEqual(from, to)) {
-      return diffs.concat({ path: path.join("."), from, to });
-    }
-
-    return diffs;
+    return diffs.concat({ path: path.join("."), from, to });
   }, []);
 };
 
@@ -126,7 +122,7 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
       kind: String,
       date: Date,
       metas: mongoose.Schema.Types.Mixed,
-      diffs: [{
+      diffs: [new mongoose.Schema({
         kind: String,
         path: String,
         from: {
@@ -135,7 +131,7 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
         to: {
           type: mongoose.Schema.Types.Mixed
         }
-      }]
+      }, { _id: false })]
     }, { versionKey: false });
     HistoryItemSchema.loadClass(HistoryItemClass);
 
@@ -173,9 +169,9 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
     try {
       const queryUpdating = new (query.toConstructor())();
       queryUpdating.setUpdate({});
-      query.__updatingRows = await queryUpdating.find();
+      query._updatingRows = await queryUpdating.find();
     } catch (e) {
-      query.__updatingRows = [];
+      query._updatingRows = [];
     }
   };
 
@@ -186,10 +182,10 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
       try {
         const queryUpdated = new (query.toConstructor())();
         queryUpdated.setUpdate({});
-        query.__updatedRows = await queryUpdated.find();
+        query._updatedRows = await queryUpdated.find();
 
-        await Promise.all(query.__updatingRows.map(async row => {
-          const updatedRow = query.__updatedRows.find(({ id }) => id === row.id);
+        await Promise.all(query._updatingRows.map(async row => {
+          const updatedRow = query._updatedRows.find(({ id }) => id === row.id);
           if (!updatedRow) {
             return;
           }
