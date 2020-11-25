@@ -80,16 +80,9 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
     }
 
     async assignMetas(metas) {
-      if (!metas) {
-        return;
+      if ("function" === typeof metas) {
+        metas = await metas.apply(this, [this.__original, this.__updated, this.__context]);
       }
-
-      await Promise.all(Object.keys(metas).map(async key => {
-        const value = metas[key];
-        if (typeof value === "function") {
-          metas[key] = await value(this.__original, this.__updated, this.__context);
-        }
-      }));
 
       this.metas = this.metas || {};
       Object.assign(this.metas, metas);
@@ -156,10 +149,12 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
     // @ts-ignore
     if (document.__wasNew) {
       // @ts-ignore
+      document.__wasNew = false;
+      // @ts-ignore
       const HistoryItem = getHistoryModel(document.constructor.collection.name, document.constructor.modelName);
       const historyItem = HistoryItem.create(undefined, document, document);
-      historyItem.filterDiffs(options.filter);
       await historyItem.assignMetas(options.metas);
+      historyItem.filterDiffs(options.filter);
       await historyItem.save();
     }
   };
@@ -195,7 +190,7 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
           const HistoryItem = getHistoryModel(query.model.collection.name, query.model.modelName);
           HistoryItem.create(row, updatedRow, query);
           const historyItem = HistoryItem.create(row, updatedRow, query);
-          historyItem.assignMetas(options.metas);
+          await historyItem.assignMetas(options.metas);
           historyItem.filterDiffs(options.filter);
           await historyItem.save();
         }));
@@ -237,7 +232,7 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
 
           const HistoryItem = getHistoryModel(query.model.collection.name, query.model.modelName);
           const historyItem = HistoryItem.create(row, undefined, query);
-          historyItem.assignMetas(options.metas);
+          await historyItem.assignMetas(options.metas);
           historyItem.filterDiffs(options.filter);
           await historyItem.save();
         }));
