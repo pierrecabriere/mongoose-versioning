@@ -64,15 +64,15 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
 
       if (item.__original === undefined) {
         item.kind = "create";
-        const diffs = getDiffs(item.__updated && item.__updated.toJSON());
+        const diffs = getDiffs(item.__updated?.toJSON?.call(item.__updated));
         Object.assign(item, { diffs });
       } else if (item.__updated === undefined) {
         item.kind = "delete";
-        const diffs = getDiffs(undefined, item.__original && item.__original.toJSON());
+        const diffs = getDiffs(undefined, item.__original?.toJSON?.call(item.__original));
         Object.assign(item, { diffs });
       } else {
         item.kind = "update";
-        const diffs = getDiffs(item.__updated && item.__updated.toJSON(), item.__original && item.__original.toJSON());
+        const diffs = getDiffs(item.__updated?.toJSON?.call(item.__updated), item.__original?.toJSON?.call(item.__original));
         Object.assign(item, { diffs });
       }
 
