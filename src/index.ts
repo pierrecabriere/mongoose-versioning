@@ -7,7 +7,8 @@ interface IOptions {
   collectionName?: String,
   modelName?: String,
   metas?: any,
-  filter?: Function
+  filter?: Function,
+  handleSave?: Function
 }
 
 const getDiffPaths = (object, base, path = []) => {
@@ -155,7 +156,11 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
       const historyItem = HistoryItem.create(undefined, document, document);
       await historyItem.assignMetas(options.metas);
       historyItem.filterDiffs(options.filter);
-      await historyItem.save();
+      if (typeof options.handleSave === "function") {
+        await options.handleSave(historyItem);
+      } else {
+        await historyItem.save();
+      }
     }
   };
 
@@ -192,7 +197,11 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
           const historyItem = HistoryItem.create(row, updatedRow, query);
           await historyItem.assignMetas(options.metas);
           historyItem.filterDiffs(options.filter);
-          await historyItem.save();
+          if (typeof options.handleSave === "function") {
+            await options.handleSave(historyItem);
+          } else {
+            await historyItem.save();
+          }
         }));
 
         resolve();
@@ -234,7 +243,11 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
           const historyItem = HistoryItem.create(row, undefined, query);
           await historyItem.assignMetas(options.metas);
           historyItem.filterDiffs(options.filter);
-          await historyItem.save();
+          if (typeof options.handleSave === "function") {
+            await options.handleSave(historyItem);
+          } else {
+            await historyItem.save();
+          }
         }));
 
         resolve();
