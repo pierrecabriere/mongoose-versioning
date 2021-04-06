@@ -182,9 +182,8 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
     const query = this as mongoose.Query;
     new Promise(async (resolve, reject) => {
       try {
-        const queryUpdated = new (query.toConstructor())();
-        queryUpdated.setUpdate({});
-        query._updatedRows = await queryUpdated.find();
+        const ids = query._updatingRows.map(({id}) => id);
+        query._updatedRows = await query.model.find({ _id: { $in: ids } });
 
         await Promise.all(query._updatingRows.map(async row => {
           const updatedRow = query._updatedRows.find(({ id }) => id === row.id);
@@ -229,16 +228,11 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
     const query = this as mongoose.Query;
     new Promise(async (resolve, reject) => {
       try {
-        const queryDeleted = new (query.toConstructor())();
-        queryDeleted.setUpdate({});
-        query.__deletedRows = await queryDeleted.find();
+        const ids = query.__deletingRows.map(({id}) => id);
+        const postDeleteQuery = await query.model.find({ _id: { $in: ids } }).select("_id").lean();
+        query.__deletedRows = query.__deletingRows.filter(({ id }) => !postDeleteQuery.find(row => row.id === id));
 
-        await Promise.all(query.__deletingRows.map(async row => {
-          const deletedRow = query.__deletedRows.find(({ id }) => id === row.id);
-          if (deletedRow) {
-            return;
-          }
-
+        await Promise.all(query.__deletedRows.map(async row => {
           const HistoryItem = getHistoryModel(query.model.collection.name, query.model.modelName);
           const historyItem = HistoryItem.create(row, undefined, query);
           await historyItem.assignMetas(options.metas);
@@ -252,6 +246,7 @@ function mongooseVersioning(schema: mongoose.Schema, options: IOptions = {}) {
 
         resolve();
       } catch (e) {
+        console.log(e);
         reject(e);
       }
     });
