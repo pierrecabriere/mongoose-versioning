@@ -120,7 +120,7 @@ function mongooseVersioning(schema: mongoose.Schema, options: Options = {}) {
           }
         }));
 
-        resolve();
+        resolve(true);
       } catch (e) {
         reject(e);
       }
@@ -130,6 +130,8 @@ function mongooseVersioning(schema: mongoose.Schema, options: Options = {}) {
   const preDelete = async function () {
     // @ts-ignore
     const query = this as mongoose.Query;
+
+    console.log(this);
 
     try {
       const queryDeleting = new (query.toConstructor())();
@@ -161,7 +163,7 @@ function mongooseVersioning(schema: mongoose.Schema, options: Options = {}) {
           }
         }));
 
-        resolve();
+        resolve(true);
       } catch (e) {
         console.log(e);
         reject(e);
@@ -169,11 +171,32 @@ function mongooseVersioning(schema: mongoose.Schema, options: Options = {}) {
     });
   };
 
+  const preRemove = async function () {
+  };
+
+  const postRemove = async function () {
+    // @ts-ignore
+    const document = this as mongoose.Document;
+    // @ts-ignore
+    const doc = document._doc;
+    // @ts-ignore
+    const HistoryItem = getHistoryModel(document.constructor.collection.name, document.constructor.modelName);
+    const historyItem = HistoryItem.create(doc, undefined, doc);
+    await historyItem.assignMetas(options.metas);
+    historyItem.filterDiffs(options.filter);
+    if (typeof options.handleSave === "function") {
+      await options.handleSave(historyItem);
+    } else {
+      await historyItem.save();
+    }
+  };
+
   schema.statics.getHistoryModel = function () {
     return getHistoryModel(this.collection.name, this.modelName);
   };
 
   schema.statics.addHistoryVirtual = function () {
+    // @ts-ignore
     const HistoryModel = this.getHistoryModel();
     this.schema.virtual("__history", {
       ref: HistoryModel.modelName,
@@ -193,6 +216,9 @@ function mongooseVersioning(schema: mongoose.Schema, options: Options = {}) {
 
   schema.pre('updateMany', preUpdate);
   schema.post('updateMany', postUpdate);
+
+  schema.pre('remove', preRemove);
+  schema.post('remove', postRemove);
 
   schema.pre('deleteOne', preDelete);
   schema.post('deleteOne', postDelete);
