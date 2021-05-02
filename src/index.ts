@@ -131,8 +131,6 @@ function mongooseVersioning(schema: mongoose.Schema, options: Options = {}) {
     // @ts-ignore
     const query = this as mongoose.Query;
 
-    console.log(this);
-
     try {
       const queryDeleting = new (query.toConstructor())();
       queryDeleting.setUpdate({});
