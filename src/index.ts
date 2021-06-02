@@ -7,7 +7,8 @@ interface Options {
   modelName?: String,
   metas?: any,
   filter?: Function,
-  handleSave?: Function
+  handleSave?: Function,
+  saveNoDiffs?: Boolean
 }
 
 const diffsSchema = new mongoose.Schema({
@@ -21,7 +22,13 @@ const diffsSchema = new mongoose.Schema({
   }
 }, { _id: false });
 
+const defaultOptions = {
+  saveNoDiffs: false,
+};
+
 function mongooseVersioning(schema: mongoose.Schema, options: Options = {}) {
+  options = Object.assign({}, defaultOptions, options);
+
   const getCollectionName = function (_collectionName?) {
     return options.collectionName || (_collectionName && `${ _collectionName }_history`);
   };
@@ -75,7 +82,7 @@ function mongooseVersioning(schema: mongoose.Schema, options: Options = {}) {
       historyItem.filterDiffs(options.filter);
       if (typeof options.handleSave === "function") {
         await options.handleSave(historyItem);
-      } else {
+      } else if (historyItem.diffs.length || options.saveNoDiffs) {
         await historyItem.save();
       }
     }
@@ -115,7 +122,7 @@ function mongooseVersioning(schema: mongoose.Schema, options: Options = {}) {
           historyItem.filterDiffs(options.filter);
           if (typeof options.handleSave === "function") {
             await options.handleSave(historyItem);
-          } else {
+          } else if (historyItem.diffs.length || options.saveNoDiffs) {
             await historyItem.save();
           }
         }));
@@ -156,7 +163,7 @@ function mongooseVersioning(schema: mongoose.Schema, options: Options = {}) {
           historyItem.filterDiffs(options.filter);
           if (typeof options.handleSave === "function") {
             await options.handleSave(historyItem);
-          } else {
+          } else if (historyItem.diffs.length || options.saveNoDiffs) {
             await historyItem.save();
           }
         }));

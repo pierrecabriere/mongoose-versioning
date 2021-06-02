@@ -1,26 +1,41 @@
-import mongoose from "mongoose";
 import isEqual from "fast-deep-equal";
 import _ from "lodash/object";
 
-export const getDiffPaths = (object, base, path = []) => {
-    let keys = object ? Object.keys(object) : [];
-    try {
-        keys = keys.concat(Object.keys(base).filter(key => !keys.includes(key)));
-    } catch (e) {}
-    return keys.reduce((result, key) => {
-        const to = object && _.get(object, key) && mongoose.Types.ObjectId.isValid(object[key]) ? _.get(object, key).toString() : object && _.get(object, key);
-        const from = base && _.get(base, key) && mongoose.Types.ObjectId.isValid(base[key]) ? _.get(base, key).toString() : base && _.get(base, key);
+export const serialize = (input) => {
+    return JSON.parse(JSON.stringify(input));
+};
 
-        if ((to && typeof to === "object" && Object.keys(to).length && !Array.isArray(to)) || (from && typeof from === "object" && Object.keys(from).length) && !Array.isArray(from)) {
-            return result.concat(getDiffPaths(to, from, path.concat(key)));
-        } else {
-            return isEqual(from, to) ? result : result.concat([path.concat(key)]);
+export const getDiffPaths = (object, base, path = []) => {
+    const objectKeys = object ? Object.keys(object) : [];
+    const baseKeys = base ? Object.keys(base) : [];
+    const keys = objectKeys.concat(baseKeys.filter(k => !objectKeys.includes(k)));
+
+    const set = keys.reduce((resultSet, key) => {
+        const from = base && _.get(base, key);
+        const to = object && _.get(object, key);
+
+        const currentPath = path.concat(key);
+
+        if ((from && typeof from === "object" && Object.keys(from).length && !Array.isArray(from)) || (to && typeof to === "object" && Object.keys(to).length && !Array.isArray(to))) {
+            const diffPaths = getDiffPaths(to, from, currentPath);
+            diffPaths.forEach(d => resultSet.add(d));
+        } else if (!isEqual(from, to)) {
+            resultSet.add(currentPath);
         }
-    }, []);
+
+        return resultSet;
+    }, new Set([]));
+
+    return [...set];
 };
 
 export const getDiffs = (object, base = {}) => {
-    const paths = getDiffPaths(object, base);
+    let paths = [];
+    try {
+        paths = getDiffPaths(serialize(object), serialize(base));
+    } catch (e) {
+        console.log(e);
+    }
     return paths.reduce((diffs, path) => {
         const from = base && _.get(base, path);
         const to = object && _.get(object, path);
