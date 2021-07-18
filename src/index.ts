@@ -2,25 +2,28 @@ import mongoose from "mongoose";
 import HistoryItemClass from "./HistoryItemClass";
 
 interface Options {
-  connection?: mongoose.Connection,
-  collectionName?: String,
-  modelName?: String,
-  metas?: any,
-  filter?: Function,
-  handleSave?: Function,
-  saveNoDiffs?: Boolean
+  connection?: mongoose.Connection;
+  collectionName?: String;
+  modelName?: String;
+  metas?: any;
+  filter?: Function;
+  handleSave?: Function;
+  saveNoDiffs?: Boolean;
 }
 
-const diffsSchema = new mongoose.Schema({
-  kind: String,
-  path: String,
-  from: {
-    type: mongoose.Schema.Types.Mixed,
+const diffsSchema = new mongoose.Schema(
+  {
+    kind: String,
+    path: String,
+    from: {
+      type: mongoose.Schema.Types.Mixed,
+    },
+    to: {
+      type: mongoose.Schema.Types.Mixed,
+    },
   },
-  to: {
-    type: mongoose.Schema.Types.Mixed
-  }
-}, { _id: false });
+  { _id: false },
+);
 
 const defaultOptions = {
   saveNoDiffs: false,
@@ -30,7 +33,7 @@ function mongooseVersioning(schema: mongoose.Schema, options: Options = {}) {
   options = Object.assign({}, defaultOptions, options);
 
   const getCollectionName = function (_collectionName?) {
-    return options.collectionName || (_collectionName && `${ _collectionName }_history`);
+    return options.collectionName || (_collectionName && `${_collectionName}_history`);
   };
 
   const getModelName = function (_modelName?) {
@@ -41,20 +44,25 @@ function mongooseVersioning(schema: mongoose.Schema, options: Options = {}) {
     const collectionName = getCollectionName(_collectionName);
     const modelName = getModelName(_modelName);
 
-    const HistoryItemSchema = new mongoose.Schema({
-      document: modelName ? {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: modelName
-      } : String,
-      kind: String,
-      date: Date,
-      metas: mongoose.Schema.Types.Mixed,
-      diffs: [diffsSchema]
-    }, { versionKey: false });
+    const HistoryItemSchema = new mongoose.Schema(
+      {
+        document: modelName
+          ? {
+              type: mongoose.Schema.Types.ObjectId,
+              ref: modelName,
+            }
+          : String,
+        kind: String,
+        date: Date,
+        metas: mongoose.Schema.Types.Mixed,
+        diffs: [diffsSchema],
+      },
+      { versionKey: false },
+    );
     HistoryItemSchema.loadClass(HistoryItemClass);
 
     const connection: any = options.connection || mongoose;
-    return connection.model(collectionName, HistoryItemSchema, collectionName)
+    return connection.model(collectionName, HistoryItemSchema, collectionName);
   };
 
   const preSave = async function () {
@@ -69,14 +77,14 @@ function mongooseVersioning(schema: mongoose.Schema, options: Options = {}) {
   const postSave = async function () {
     // @ts-ignore
     const document = this as mongoose.Document;
+    const { constructor } = Object.getPrototypeOf(this);
     // @ts-ignore
     if (document.__wasNew) {
       // @ts-ignore
       document.__wasNew = false;
       // @ts-ignore
       const doc = document._doc;
-      // @ts-ignore
-      const HistoryItem = getHistoryModel(document.constructor.collection.name, document.constructor.modelName);
+      const HistoryItem = getHistoryModel(constructor.collection.name, constructor.modelName);
       const historyItem = HistoryItem.create(undefined, doc, doc);
       await historyItem.assignMetas(options.metas);
       historyItem.filterDiffs(options.filter);
@@ -109,23 +117,25 @@ function mongooseVersioning(schema: mongoose.Schema, options: Options = {}) {
         const ids = query._updatingRows.map(({ id }) => id);
         query.__updatedRows = await query.model.where({ _id: { $in: ids } }).find();
 
-        await Promise.all(query.__updatingRows.map(async row => {
-          const updatedRow = query.__updatedRows.find(({ id }) => id === row.id);
-          if (!updatedRow) {
-            return;
-          }
+        await Promise.all(
+          query.__updatingRows.map(async (row) => {
+            const updatedRow = query.__updatedRows.find(({ id }) => id === row.id);
+            if (!updatedRow) {
+              return;
+            }
 
-          const HistoryItem = getHistoryModel(query.model.collection.name, query.model.modelName);
-          HistoryItem.create(row, updatedRow, query);
-          const historyItem = HistoryItem.create(row, updatedRow, query);
-          await historyItem.assignMetas(options.metas);
-          historyItem.filterDiffs(options.filter);
-          if (typeof options.handleSave === "function") {
-            await options.handleSave(historyItem);
-          } else if (historyItem.diffs.length || options.saveNoDiffs) {
-            await historyItem.save();
-          }
-        }));
+            const HistoryItem = getHistoryModel(query.model.collection.name, query.model.modelName);
+            HistoryItem.create(row, updatedRow, query);
+            const historyItem = HistoryItem.create(row, updatedRow, query);
+            await historyItem.assignMetas(options.metas);
+            historyItem.filterDiffs(options.filter);
+            if (typeof options.handleSave === "function") {
+              await options.handleSave(historyItem);
+            } else if (historyItem.diffs.length || options.saveNoDiffs) {
+              await historyItem.save();
+            }
+          }),
+        );
 
         resolve(true);
       } catch (e) {
@@ -153,20 +163,26 @@ function mongooseVersioning(schema: mongoose.Schema, options: Options = {}) {
     new Promise(async (resolve, reject) => {
       try {
         const ids = query.__deletingRows.map(({ id }) => id);
-        const postDeleteQuery = await query.model.where({ _id: { $in: ids } }).select("_id").lean().find();
-        query.__deletedRows = query.__deletingRows.filter(({ id }) => !postDeleteQuery.find(row => row.id === id));
+        const postDeleteQuery = await query.model
+          .where({ _id: { $in: ids } })
+          .select("_id")
+          .lean()
+          .find();
+        query.__deletedRows = query.__deletingRows.filter(({ id }) => !postDeleteQuery.find((row) => row.id === id));
 
-        await Promise.all(query.__deletedRows.map(async row => {
-          const HistoryItem = getHistoryModel(query.model.collection.name, query.model.modelName);
-          const historyItem = HistoryItem.create(row, undefined, query);
-          await historyItem.assignMetas(options.metas);
-          historyItem.filterDiffs(options.filter);
-          if (typeof options.handleSave === "function") {
-            await options.handleSave(historyItem);
-          } else if (historyItem.diffs.length || options.saveNoDiffs) {
-            await historyItem.save();
-          }
-        }));
+        await Promise.all(
+          query.__deletedRows.map(async (row) => {
+            const HistoryItem = getHistoryModel(query.model.collection.name, query.model.modelName);
+            const historyItem = HistoryItem.create(row, undefined, query);
+            await historyItem.assignMetas(options.metas);
+            historyItem.filterDiffs(options.filter);
+            if (typeof options.handleSave === "function") {
+              await options.handleSave(historyItem);
+            } else if (historyItem.diffs.length || options.saveNoDiffs) {
+              await historyItem.save();
+            }
+          }),
+        );
 
         resolve(true);
       } catch (e) {
@@ -176,8 +192,7 @@ function mongooseVersioning(schema: mongoose.Schema, options: Options = {}) {
     });
   };
 
-  const preRemove = async function () {
-  };
+  const preRemove = async function () {};
 
   const postRemove = async function () {
     // @ts-ignore
@@ -196,6 +211,29 @@ function mongooseVersioning(schema: mongoose.Schema, options: Options = {}) {
     }
   };
 
+  const preInsertMany = async function () {};
+
+  const postInsertMany = async function () {
+    const documents = arguments[0] as mongoose.Document[];
+    await Promise.all(
+      documents.map(async (document) => {
+        // @ts-ignore
+        const doc = document._doc;
+
+        // @ts-ignore
+        const HistoryItem = getHistoryModel(document.constructor.collection.name, document.constructor.modelName);
+        const historyItem = HistoryItem.create(undefined, doc, doc);
+        await historyItem.assignMetas(options.metas);
+        historyItem.filterDiffs(options.filter);
+        if (typeof options.handleSave === "function") {
+          await options.handleSave(historyItem);
+        } else if (historyItem.diffs.length || options.saveNoDiffs) {
+          await historyItem.save();
+        }
+      }),
+    );
+  };
+
   schema.statics.getHistoryModel = function () {
     return getHistoryModel(this.collection.name, this.modelName);
   };
@@ -205,31 +243,34 @@ function mongooseVersioning(schema: mongoose.Schema, options: Options = {}) {
     const HistoryModel = this.getHistoryModel();
     this.schema.virtual("__history", {
       ref: HistoryModel.modelName,
-      localField: '_id',
-      foreignField: 'document'
+      localField: "_id",
+      foreignField: "document",
     });
   };
 
-  schema.pre('save', preSave);
-  schema.post('save', postSave);
+  schema.pre("save", preSave);
+  schema.post("save", postSave);
 
-  schema.pre('update', preUpdate);
-  schema.post('update', postUpdate);
+  schema.pre("update", preUpdate);
+  schema.post("update", postUpdate);
 
-  schema.pre('updateOne', preUpdate);
-  schema.post('updateOne', postUpdate);
+  schema.pre("updateOne", preUpdate);
+  schema.post("updateOne", postUpdate);
 
-  schema.pre('updateMany', preUpdate);
-  schema.post('updateMany', postUpdate);
+  schema.pre("updateMany", preUpdate);
+  schema.post("updateMany", postUpdate);
 
-  schema.pre('remove', preRemove);
-  schema.post('remove', postRemove);
+  schema.pre("remove", preRemove);
+  schema.post("remove", postRemove);
 
-  schema.pre('deleteOne', preDelete);
-  schema.post('deleteOne', postDelete);
+  schema.pre("deleteOne", preDelete);
+  schema.post("deleteOne", postDelete);
 
-  schema.pre('deleteMany', preDelete);
-  schema.post('deleteMany', postDelete);
+  schema.pre("deleteMany", preDelete);
+  schema.post("deleteMany", postDelete);
+
+  schema.pre("insertMany", preInsertMany);
+  schema.post("insertMany", postInsertMany);
 }
 
 export default mongooseVersioning;
