@@ -114,7 +114,7 @@ function mongooseVersioning(schema: mongoose.Schema, options: Options = {}) {
     const query = this as mongoose.Query;
     new Promise(async (resolve, reject) => {
       try {
-        const ids = query._updatingRows.map(({ id }) => id);
+        const ids = query.__updatingRows.map(({ id }) => id);
         query.__updatedRows = await query.model.where({ _id: { $in: ids } }).find();
 
         await Promise.all(
