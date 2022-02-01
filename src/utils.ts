@@ -2,7 +2,7 @@ import isEqual from "fast-deep-equal";
 import _ from "lodash/object";
 
 export const serialize = (input) => {
-  return JSON.parse(JSON.stringify(input));
+  return input && typeof input === "object" ? JSON.parse(JSON.stringify(input)) : input;
 };
 
 export const getDiffPaths = (object, base, path = []) => {
