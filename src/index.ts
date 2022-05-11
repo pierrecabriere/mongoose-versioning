@@ -25,6 +25,8 @@ const diffsSchema = new mongoose.Schema(
   { _id: false },
 );
 
+declare module "mongoose" {}
+
 const defaultOptions = {
   saveNoDiffs: false,
 };
@@ -100,12 +102,15 @@ function mongooseVersioning(schema: mongoose.Schema, options: Options = {}) {
     // @ts-ignore
     const query = this as mongoose.Query;
 
-    try {
-      const queryUpdating = new (query.toConstructor())();
-      queryUpdating.setUpdate({});
-      query.__updatingRows = await queryUpdating.find();
-    } catch (e) {
+    if (!query.__updatingRows) {
       query.__updatingRows = [];
+
+      try {
+        const queryUpdating = new (query.toConstructor())();
+        queryUpdating.setUpdate({});
+
+        query.__updatingRows = await queryUpdating.find();
+      } catch (e) {}
     }
   };
 

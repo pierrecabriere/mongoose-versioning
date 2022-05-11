@@ -4,6 +4,7 @@
     "sourceMap": true,
     "declaration": true,
     "esModuleInterop": true,
+    "skipLibCheck": true,
     "moduleResolution": "node",
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
